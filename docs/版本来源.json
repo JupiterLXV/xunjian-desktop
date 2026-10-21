@@ -1,0 +1,16 @@
+{
+  "version": "50.4.0",
+  "inputs": [
+    {
+      "name": "xunjian-desktop/resources/app.asar",
+      "version": "50.3.0",
+      "sha256": "8c4af8e75ce5a19b5ab2b01c476e0a55d9ea9a05177df5b606aa67973fc8e6ed"
+    },
+    {
+      "name": "巡检缺陷工具/package.json",
+      "version": "50.2.1",
+      "sha256": "e158b2735a763a352b0b3f08250866865031e4c8b5cf8cbffebc89d40d3d7938"
+    }
+  ],
+  "note": "原目录保持不变；实际服务配置未纳入公开源码和二进制。"
+}

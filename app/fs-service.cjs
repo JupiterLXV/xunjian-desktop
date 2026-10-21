@@ -1,0 +1,36 @@
+'use strict';
+const fs=require('node:fs/promises'),path=require('node:path'),crypto=require('node:crypto');
+const error=(name,message)=>Object.assign(new Error(message),{name});
+class FileService{
+ constructor(dataDir){this.dataDir=dataDir;this.grants=new Map();this.writers=new Map();this.watch=new (require('./directory-watch.cjs').DirectoryWatch)(this);this.logChain=Promise.resolve();}
+ async init(){await fs.mkdir(this.dataDir,{recursive:true});try{const rows=JSON.parse(await fs.readFile(path.join(this.dataDir,'directories.json'),'utf8'));for(const r of rows)if(typeof r.id==='string'&&path.isAbsolute(r.path))this.grants.set(r.id,r.path);}catch(e){if(e.code!=='ENOENT')throw e;}}
+ async grant(dir){dir=await fs.realpath(dir);if(!(await fs.stat(dir)).isDirectory())throw error('TypeMismatchError','请选择文件夹');let id=[...this.grants].find(([,p])=>p===dir)?.[0];if(!id){id=crypto.randomUUID();this.grants.set(id,dir);await this.saveGrants();}return this.descriptor(id,'','directory');}
+ async saveGrants(){const p=path.join(this.dataDir,'directories.json'),tmp=p+'.tmp';await fs.writeFile(tmp,JSON.stringify([...this.grants].map(([id,path])=>({id,path}))));await fs.rename(tmp,p);}
+ descriptor(root,rel,kind){return {__desktopHandle:true,root,rel,kind,name:rel?path.posix.basename(rel):path.basename(this.grants.get(root)||'')};}
+ part(name){if(typeof name!=='string'||!name||name==='.'||name==='..'||/[\\/\x00-\x1f<>:"|?*]/.test(name)||/[. ]$/.test(name)||/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(name))throw error('TypeError','文件名无效：'+name);return name;}
+ async locate(h,missing=false){if(!h||!this.grants.has(h.root)||typeof h.rel!=='string')throw error('NotAllowedError','目录未授权，请重新选择');const base=this.grants.get(h.root);const parts=h.rel?h.rel.split('/').map(x=>this.part(x)):[];let p=base;const rootStat=await fs.lstat(base);if(rootStat.isSymbolicLink()||!rootStat.isDirectory())throw error('NotAllowedError','目录已改变，请重新选择');for(let i=0;i<parts.length;i++){p=path.join(p,parts[i]);try{const s=await fs.lstat(p);if(s.isSymbolicLink())throw error('NotAllowedError','为防止越过选定目录，不处理符号链接');}catch(e){if(e.code==='ENOENT'&&missing&&i===parts.length-1)return p;throw e;}}return p;}
+ async call(op,args){switch(op){
+ case 'organize':return require('./output-ops.cjs').organize(this,args);
+ case 'recover-output':await require('./output-ops.cjs').recover(this,args.h);return require('./output-trash.cjs').recover(this,args.h);
+ case 'snapshot':return require('./directory-watch.cjs').snapshot(this,args);
+ case 'watch':return this.watch.set(args.handles);
+ case 'trash-list':return require('./output-trash.cjs').list(this,args);
+ case 'trash-delete':case 'trash-restore':{try{const result=await require('./output-trash.cjs')[op==='trash-delete'?'remove':'restore'](this,args);await this.record({action:op==='trash-delete'?'删除成果':'恢复成果',name:args.label||args.id||'',count:result.count,status:'成功'}).catch(e=>{result.logWarning=e.message;});return result;}catch(e){await this.record({action:op==='trash-delete'?'删除成果':'恢复成果',name:args.label||args.id||'',status:'失败',error:e.message}).catch(()=>{});throw e;}}
+ case 'record-operation':await this.record(args);return true;
+ case 'operation-list':try{return JSON.parse(await fs.readFile(path.join(this.dataDir,'operations.json'),'utf8'));}catch(e){if(e.code==='ENOENT')return [];throw e;}
+ case 'permission':try{await this.locate(args.h);return 'granted';}catch{return 'prompt';}
+ case 'list':{const p=await this.locate(args.h),list=await fs.readdir(p,{withFileTypes:true});return list.filter(x=>!x.isSymbolicLink()&&!x.name.startsWith('.xunjian-write-')).map(x=>this.descriptor(args.h.root,[args.h.rel,x.name].filter(Boolean).join('/'),x.isDirectory()?'directory':'file'));}
+ case 'child':{const name=this.part(args.name),h=this.descriptor(args.h.root,[args.h.rel,name].filter(Boolean).join('/'),args.kind);await this.locate(args.h);const p=await this.locate(h,!!args.create);if(args.create){if(args.kind==='directory')await fs.mkdir(p).catch(e=>{if(e.code!=='EEXIST')throw e;});else{const fd=await fs.open(p,'a');await fd.close();}}const stat=await fs.stat(p);if(stat.isDirectory()!==(args.kind==='directory'))throw error('TypeMismatchError','文件类型不匹配');return h;}
+ case 'stat':{const p=await this.locate(args.h),s=await fs.stat(p);return {size:s.size,lastModified:s.mtimeMs};}
+ case 'remove':{const h=this.descriptor(args.h.root,[args.h.rel,this.part(args.name)].filter(Boolean).join('/'),'file'),p=await this.locate(h);const s=await fs.stat(p);if(s.isDirectory()){if(args.recursive)await fs.rm(p,{recursive:true});else await fs.rmdir(p);}else await fs.unlink(p);return true;}
+ case 'move':{const from=await this.locate(args.h);if(args.h.kind!=='file')throw error('NotSupportedError','只支持文件改名');const rel=[path.posix.dirname(args.h.rel)==='.'?'':path.posix.dirname(args.h.rel),this.part(args.name)].filter(Boolean).join('/');if(rel===args.h.rel)return args.h;const h=this.descriptor(args.h.root,rel,'file'),to=await this.locate(h,true);await fs.link(from,to);try{await fs.unlink(from);}catch(e){await fs.unlink(to);throw e;}return h;}
+ case 'begin':{const target=await this.locate(args.h);if([...this.writers.values()].some(x=>x.target===target))throw error('InvalidStateError','该文件正在写入');const id=crypto.randomUUID(),temp=path.join(path.dirname(target),'.xunjian-write-'+id);const fd=await fs.open(temp,'wx');this.writers.set(id,{fd,temp,target,h:args.h});return id;}
+ case 'chunk':{const w=this.writers.get(args.id);if(!w)throw error('InvalidStateError','写入任务已关闭');const b=Buffer.from(args.bytes);if(b.length>4*1024*1024)throw error('QuotaExceededError','写入块过大');let offset=0;while(offset<b.length){const {bytesWritten}=await w.fd.write(b,offset,b.length-offset);offset+=bytesWritten;}return true;}
+ case 'commit':{const w=this.writers.get(args.id);if(!w)throw error('InvalidStateError','写入任务已关闭');await this.locate(w.h);await w.fd.sync();await w.fd.close();await fs.rename(w.temp,w.target);this.writers.delete(args.id);return true;}
+ case 'abort':{const w=this.writers.get(args.id);if(w){await w.fd.close().catch(()=>{});await fs.unlink(w.temp).catch(()=>{});this.writers.delete(args.id);}return true;}
+ default:throw error('NotSupportedError','不支持的操作');}}
+ async record(row){const entry={time:new Date().toISOString(),action:String(row.action||'操作').slice(0,80),name:String(row.name||'').slice(0,300),status:String(row.status||'成功').slice(0,30),count:Number(row.count)||0,error:String(row.error||'').slice(0,500)};this.logChain=this.logChain.catch(()=>{}).then(async()=>{const p=path.join(this.dataDir,'operations.json');let rows=[];try{rows=JSON.parse(await fs.readFile(p,'utf8'));}catch(e){if(e.code!=='ENOENT')throw e;}rows.push(entry);const tmp=p+'.tmp';await fs.writeFile(tmp,JSON.stringify(rows.slice(-500)));await fs.rename(tmp,p);});return this.logChain;}
+ async cleanup(){this.watch.close();await this.logChain.catch(()=>{});for(const id of [...this.writers.keys()])await this.call('abort',{id});}
+}
+function normalizeError(e){const names={ENOENT:'NotFoundError',EACCES:'NotAllowedError',EPERM:'NotAllowedError',EEXIST:'InvalidModificationError',ENOTEMPTY:'InvalidModificationError',ENOSPC:'QuotaExceededError'};return {name:names[e.code]||e.name||'Error',message:e.code==='ENOSPC'?'磁盘空间不足，请释放空间后重试':e.message};}
+module.exports={FileService,normalizeError};

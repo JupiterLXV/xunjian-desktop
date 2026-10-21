@@ -1,0 +1,92 @@
+{
+  "name": "xunjian-desktop",
+  "version": "50.4.0",
+  "description": "巡检缺陷图像标注软件：联网登录、本地标注、目录同步与成果回收",
+  "author": "Xunjian Desktop",
+  "private": true,
+  "main": "app/main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test tests/*.test.cjs",
+    "dist": "node scripts/prepare-protected.cjs && node scripts/validate-protected.cjs && electron-builder --win nsis --x64 --config.directories.app=.build/protected --publish never && node scripts/verify-release.cjs",
+    "dist:dir": "node scripts/prepare-protected.cjs && node scripts/validate-protected.cjs && electron-builder --win --x64 --dir --config.directories.app=.build/protected --publish never && node scripts/verify-release.cjs",
+    "dist:portable": "node scripts/prepare-protected.cjs && node scripts/validate-protected.cjs && electron-builder --win portable --x64 --config.directories.app=.build/protected --publish never && node scripts/verify-release.cjs",
+    "dist:linux": "node scripts/prepare-protected.cjs && node scripts/validate-protected.cjs && node scripts/build-linux.cjs",
+    "test:smoke": "node tests/electron-smoke.cjs",
+    "dist:all": "node scripts/prepare-protected.cjs && node scripts/validate-protected.cjs && electron-builder --win nsis portable --x64 --config.directories.app=.build/protected --publish never && node scripts/verify-release.cjs"
+  },
+  "devDependencies": {
+    "electron": "44.7.0",
+    "electron-builder": "26.15.3",
+    "javascript-obfuscator": "5.9.0",
+    "playwright": "1.64.1"
+  },
+  "build": {
+    "appId": "local.xunjian.desktop",
+    "productName": "图像标注软件",
+    "electronLanguages": [
+      "zh-CN",
+      "en-US"
+    ],
+    "asar": true,
+    "extraResources": [
+      {
+        "from": "build/icon.ico",
+        "to": "icon.ico"
+      }
+    ],
+    "electronFuses": {
+      "runAsNode": false,
+      "enableNodeOptionsEnvironmentVariable": false,
+      "enableNodeCliInspectArguments": false,
+      "enableEmbeddedAsarIntegrityValidation": true,
+      "onlyLoadAppFromAsar": true
+    },
+    "files": [
+      "app/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "build/icon.ico",
+      "signAndEditExecutable": true,
+      "signExecutable": false
+    },
+    "portable": {
+      "artifactName": "xunjian-desktop-${version}-windows-x64-portable.exe"
+    },
+    "nsis": {
+      "artifactName": "xunjian-desktop-${version}-windows-x64-setup.exe",
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "图像标注软件",
+      "uninstallDisplayName": "图像标注软件",
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false,
+      "installerLanguages": [
+        "zh_CN"
+      ],
+      "language": "2052",
+      "displayLanguageSelector": false,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "include": "build/installer.nsh",
+      "packElevateHelper": false
+    },
+    "afterPack": "scripts/after-pack.cjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/JupiterLXV/xunjian-desktop.git"
+  },
+  "homepage": "https://github.com/JupiterLXV/xunjian-desktop"
+}

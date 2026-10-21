@@ -1,0 +1,32 @@
+/* Desktop adjustments retain the user's selected i49 themes. */
+html body *{scrollbar-width:thin!important;scrollbar-color:var(--btn-border) transparent!important}
+html body *::-webkit-scrollbar{display:block!important;width:8px!important;height:8px!important}
+html body *::-webkit-scrollbar-thumb{background:var(--btn-border);border:2px solid var(--panel-bg);border-radius:8px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+#bar{padding:9px 12px;gap:7px;flex-wrap:wrap;overflow:visible}
+#bar .btn{min-height:32px;font-size:12px}
+.btn.solid-primary:hover{background:var(--accent);border-color:var(--accent);filter:brightness(.92)}
+.desktop-strip{display:flex;align-items:center;gap:10px;min-height:30px;padding:4px 12px;background:var(--panel-bg);border-top:1px solid var(--panel-border);color:var(--muted);font-size:11px;flex-shrink:0}
+.desktop-strip .app-label{font-weight:600;color:var(--text)}
+.desktop-strip .local-dot{height:6px;width:6px;border-radius:50%;background:var(--ok)}
+.desktop-strip .hint{margin-left:auto}
+.desktop-strip button{border:0;color:var(--accent);background:none;font:inherit;cursor:pointer}
+#desktopClosing{position:fixed;inset:0;background:rgba(20,30,40,.48);z-index:100000;display:grid;place-items:center}
+#desktopClosing[hidden]{display:none}
+#desktopClosing div{padding:28px 40px;background:var(--panel-bg);border-radius:12px;box-shadow:0 12px 60px #0004;color:var(--text)}
+body.desktop-closing>*:not(#desktopClosing){pointer-events:none}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+#viewerBottomBar>div:last-child{flex-wrap:wrap;justify-content:flex-end;gap:6px!important}
+#btnManageOutputs{min-height:34px;font-size:12px;white-space:nowrap}
+.sync-error{color:#b54732}
+.desktop-dialog{padding:0;width:min(800px,90vw);max-height:82vh;color:var(--text);background:var(--panel-bg);border:1px solid var(--panel-border);border-radius:7px;box-shadow:0 16px 60px #0005}
+.desktop-dialog::backdrop{background:#142a3d66}
+.desktop-dialog header{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:12px 18px;background:var(--btn-bg);border-bottom:1px solid var(--panel-border);position:sticky;top:0;z-index:1}
+.desktop-dialog-status{padding:0 18px;color:var(--muted);font-size:12px;min-height:18px;overflow-wrap:anywhere}
+.desktop-dialog-body{padding:0 18px 18px;max-height:60vh;overflow:auto}
+.output-group,.history-row{display:flex;gap:14px;align-items:center;padding:14px 0;border-bottom:1px solid var(--panel-border)}
+.output-group>div,.history-row>div{flex:1;min-width:0;overflow-wrap:anywhere}
+.output-group img{width:116px;height:80px;object-fit:contain;background:#e6edf0;border:1px solid var(--panel-border);border-radius:3px}
+.output-group p,.history-row p{margin:4px 0;font-size:12px;color:var(--muted)}
+.output-group summary{font-size:11px;color:var(--accent);cursor:pointer}
+.output-group strong{font-size:13px}.output-group button,.history-row button{flex-shrink:0}
